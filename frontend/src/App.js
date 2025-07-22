@@ -3,7 +3,7 @@ import "./App.css";
 import axios from "axios";
 const API = "http://localhost:3001";
 
-// --- Utility axios instance, otomatis tambahkan JWT ---
+// === Utility axios instance dengan Interceptor 401 ===
 const api = axios.create({ baseURL: API });
 api.interceptors.request.use(
   config => {
@@ -12,6 +12,18 @@ api.interceptors.request.use(
     return config;
   },
   error => Promise.reject(error)
+);
+
+// ==== Interceptor RESPONSE (Logout jika 401) ====
+api.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response && err.response.status === 401) {
+      localStorage.removeItem("token");
+      window.location.reload(); // Paksa reload, langsung ke halaman login
+    }
+    return Promise.reject(err);
+  }
 );
 
 // === LOGIN COMPONENT ===

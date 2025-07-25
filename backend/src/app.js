@@ -11,15 +11,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool(); // from .env
-const sessions = {}; // sessionId: { client, getQr, status, info, logs }
+const pool = new Pool();
+const sessions = {};
 
-// === LOGIN CONFIG ===
 const SECRET_KEY = process.env.JWT_SECRET || "supersecret";
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
 
-// === ENDPOINT LOGIN (public) ===
+// LOGIN ENDPOINT
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -28,8 +27,20 @@ app.post('/login', (req, res) => {
   }
   res.status(401).json({ error: "Username/password salah" });
 });
+// JWT Refresh Endpoint
+app.post('/refresh', (req, res) => {
+  try {
+    const { token } = req.body;
+    const decoded = jwt.verify(token, SECRET_KEY, { ignoreExpiration: true });
+    if (!decoded.username) return res.status(401).json({ error: "Invalid token" });
+    const newToken = jwt.sign({ username: decoded.username }, SECRET_KEY, { expiresIn: "12h" });
+    res.json({ token: newToken });
+  } catch (e) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+});
 
-// === MIDDLEWARE AUTH (kecuali /login dan /sessions/:id/qr) ===
+// AUTH MIDDLEWARE
 app.use((req, res, next) => {
   if (
     req.path === "/login" ||
@@ -47,12 +58,12 @@ app.use((req, res, next) => {
   }
 });
 
-// === HELPER SESSION ID ===
+// HELPER
 function isValidSessionId(id) {
   return /^[a-zA-Z0-9_-]+$/.test(id);
 }
 
-// ========== SESSION CRUD (DB) ==========
+// SESSION CRUD
 app.post('/sessions', async (req, res) => {
   const { sessionId, webhookUrl } = req.body;
   if (!sessionId) return res.status(400).json({ error: "sessionId required" });
@@ -73,6 +84,10 @@ app.post('/sessions', async (req, res) => {
 app.get('/sessions', async (req, res) => {
   const q = `SELECT * FROM wa_sessions ORDER BY id`;
   const result = await pool.query(q);
+  // Tambahkan status dari memory
+  result.rows.forEach(sess => {
+    sess.status = sessions[sess.session_id]?.status || "not initialized";
+  });
   res.json({ sessions: result.rows });
 });
 
@@ -97,13 +112,12 @@ app.delete('/sessions/:sessionId', async (req, res) => {
   res.json({ success: true });
 });
 
-// ============ Session Management & QR =============
+// SESSION WA INIT
 app.post('/sessions/:sessionId/init', async (req, res) => {
   const { sessionId } = req.params;
   if (!isValidSessionId(sessionId)) {
     return res.status(400).json({ error: "SessionId hanya boleh huruf, angka, _ atau -" });
   }
-  // Cari data session di DB
   const q = `SELECT * FROM wa_sessions WHERE session_id=$1`;
   const result = await pool.query(q, [sessionId]);
   if (result.rowCount === 0) return res.status(404).json({ error: "Session not found" });
@@ -128,9 +142,8 @@ app.post('/sessions/:sessionId/init', async (req, res) => {
 
   client.on('ready', () => {
     sessions[sessionId].status = "connected";
-    const info = client.info;
-    sessions[sessionId].info = info;
-    console.log(`WA Client [${sessionId}] Connected as ${info.wid.user}`);
+    sessions[sessionId].info = client.info;
+    console.log(`WA Client [${sessionId}] Connected as ${client.info.wid.user}`);
   });
 
   client.on('disconnected', (reason) => {
@@ -138,7 +151,7 @@ app.post('/sessions/:sessionId/init', async (req, res) => {
     console.log(`WA Client [${sessionId}] Disconnected:`, reason);
   });
 
-  // Log pesan masuk & auto-reply dari webhook
+  // HANDLER: Semua tipe pesan WA dikirim ke webhook!
   client.on('message', async message => {
     sessions[sessionId].logs.push({
       direction: "in",
@@ -148,6 +161,9 @@ app.post('/sessions/:sessionId/init', async (req, res) => {
       body: message.body,
       timestamp: message.timestamp,
       hasMedia: message.hasMedia || false,
+      caption: message.caption || "",
+      mimetype: message.mimetype || "",
+      filename: message.filename || "",
     });
 
     try {
@@ -156,89 +172,36 @@ app.post('/sessions/:sessionId/init', async (req, res) => {
       const webhookUrl = webres.rows[0]?.webhook_url;
       if (!webhookUrl) return;
 
-      let senderNumber = message.from.replace(/@.*/, '');
+      // Payload dikirim lengkap!
       let payload = {
-        sessionId: senderNumber,
+        sessionId,
         from: message.from,
         to: message.to,
         body: message.body,
         type: message.type,
         timestamp: message.timestamp,
-        group: message.isGroupMsg,
+        isGroupMsg: message.from.endsWith('@g.us'),
+        caption: message.caption || "",
+        mimetype: message.mimetype || "",
+        filename: message.filename || "",
+        hasMedia: message.hasMedia || false,
+        // Add more fields if you need!
       };
       if (message.hasMedia) {
         const media = await message.downloadMedia();
-        payload.media = media.data;
-        payload.filename = media.filename;
-        payload.mimetype = media.mimetype;
-        payload.caption = message.caption || "";
-      }
-      // Cek group, harus mention bot
-      if (message.isGroupMsg) {
-        const info = client.info;
-        if (!message.body.includes(info.wid.user)) return;
+        payload.media = {
+          data: media.data,
+          mimetype: media.mimetype,
+          filename: media.filename
+        };
       }
 
-      // --- Kirim ke webhook dan tunggu responnya
-      const webhookRes = await axios.post(webhookUrl, payload, { timeout: 10000 });
+      // === Kirim ke webhook ===
+      await axios.post(webhookUrl, payload, { timeout: 15000 });
+      // Catatan: Tidak perlu filter group atau mention!
 
-      // --- Kirim balasan ke WA jika ada response dari webhook
-      if (typeof webhookRes.data === "string" && webhookRes.data.trim() !== "") {
-        // Balas teks (mode plain text)
-        await client.sendMessage(message.from, webhookRes.data.trim());
-        sessions[sessionId].logs.push({
-          direction: "out",
-          to: message.from,
-          type: "text",
-          body: webhookRes.data.trim(),
-          timestamp: Math.floor(Date.now()/1000)
-        });
-      }
-      else if (typeof webhookRes.data === "object" && webhookRes.data !== null) {
-        // Balas teks (mode JSON)
-        if (webhookRes.data.text) {
-          await client.sendMessage(message.from, webhookRes.data.text);
-          sessions[sessionId].logs.push({
-            direction: "out",
-            to: message.from,
-            type: "text",
-            body: webhookRes.data.text,
-            timestamp: Math.floor(Date.now()/1000)
-          });
-        }
-        // Balas media (image/audio/document/video)
-        else if (webhookRes.data.media && webhookRes.data.mimetype) {
-          const msgMedia = new MessageMedia(
-            webhookRes.data.mimetype,
-            webhookRes.data.media,
-            webhookRes.data.filename || undefined
-          );
-          // Caption hanya dikirim untuk image/video
-          let sendOptions = {};
-          if (
-            webhookRes.data.caption &&
-            (webhookRes.data.mimetype.startsWith('image/') || webhookRes.data.mimetype.startsWith('video/'))
-          ) {
-            sendOptions.caption = webhookRes.data.caption;
-          }
-          await client.sendMessage(
-            message.from,
-            msgMedia,
-            sendOptions
-          );
-          sessions[sessionId].logs.push({
-            direction: "out",
-            to: message.from,
-            type: "media",
-            body: webhookRes.data.caption || webhookRes.data.filename || "",
-            timestamp: Math.floor(Date.now()/1000)
-          });
-        }
-      }
-      // else: jika kosong, tidak ada yang dikirim ke WA
     } catch (e) {
-      // Optional: log error ke file atau console
-      console.error('Auto-reply webhook/WA error:', e.message);
+      console.error('Webhook/WA error:', e.message);
     }
   });
 
@@ -246,7 +209,7 @@ app.post('/sessions/:sessionId/init', async (req, res) => {
   res.json({ status: "initializing" });
 });
 
-// Get QR (public)
+// GET QR (public)
 app.get('/sessions/:sessionId/qr', (req, res) => {
   const { sessionId } = req.params;
   if (!isValidSessionId(sessionId)) return res.status(400).json({ error: "SessionId hanya boleh huruf, angka, _ atau -" });
@@ -257,7 +220,7 @@ app.get('/sessions/:sessionId/qr', (req, res) => {
   res.json({ qr: sessions[sessionId].getQr() });
 });
 
-// Status
+// STATUS
 app.get('/sessions/:sessionId/status', (req, res) => {
   const { sessionId } = req.params;
   if (!isValidSessionId(sessionId)) return res.status(400).json({ error: "SessionId hanya boleh huruf, angka, _ atau -" });
@@ -269,7 +232,7 @@ app.get('/sessions/:sessionId/status', (req, res) => {
   });
 });
 
-// Log dari memory
+// LOG (dari memory)
 app.get('/sessions/:sessionId/logs', (req, res) => {
   const { sessionId } = req.params;
   if (!isValidSessionId(sessionId)) return res.status(400).json({ error: "SessionId hanya boleh huruf, angka, _ atau -" });

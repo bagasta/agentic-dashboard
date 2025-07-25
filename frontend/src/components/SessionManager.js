@@ -2,104 +2,107 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 const API = "http://localhost:3001";
 
-const SessionManager = ({ sessionId, setSessionId }) => {
-  const [sessions, setSessions] = useState([]);
-  const [input, setInput] = useState("");
-  const [webhook, setWebhook] = useState("");
+// ... (import dan axios instance tetap sama)
+
+function SessionManager({ sessionId, setSessionId, sessions, reloadSessions }) {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [newSession, setNewSession] = useState("");
   const [loading, setLoading] = useState(false);
+  const [waStatus, setWaStatus] = useState("");
+  const [notif, setNotif] = useState("");
 
-  // Muat daftar sessions saat pertama kali dan setiap sessionId berubah
   useEffect(() => {
-    axios.get(API + "/sessions").then(res => setSessions(res.data.sessions));
-  }, [sessionId]);
+    const found = sessions.find(x => x.session_id === sessionId);
+    setWebhookUrl(found ? found.webhook_url : "");
+    if (sessionId) {
+      api.get(`/sessions/${sessionId}/status`)
+        .then(res => setWaStatus(res.data.status))
+        .catch(() => setWaStatus(""));
+    } else {
+      setWaStatus("");
+    }
+  }, [sessionId, sessions]);
 
-  // Tambah session
-  const handleAdd = async () => {
-    if (!input) return;
-    setLoading(true);
-    await axios.post(API + "/sessions", { sessionId: input, webhookUrl: webhook });
-    setInput("");
-    setWebhook("");
-    setLoading(false);
-    setSessionId(input); // AUTO PILIH session setelah ditambah
-    axios.get(API + "/sessions").then(res => setSessions(res.data.sessions));
-  };
-
-  // Pilih session dari dropdown
-  const handleSelect = e => {
-    setSessionId(e.target.value);
-    const s = sessions.find(x => x.session_id === e.target.value);
-    setWebhook(s?.webhook_url || "");
-  };
-
-  // Edit webhook
-  const handleEditWebhook = async () => {
-    if (!sessionId) return;
-    setLoading(true);
-    await axios.put(API + `/sessions/${sessionId}/webhook`, { webhookUrl: webhook });
-    setLoading(false);
-    axios.get(API + "/sessions").then(res => setSessions(res.data.sessions));
-  };
-
-  // Hapus session
-  const handleDelete = async () => {
-    if (!sessionId) return;
-    setLoading(true);
-    await axios.delete(API + `/sessions/${sessionId}`);
-    setSessionId("");
-    setWebhook("");
-    setLoading(false);
-    axios.get(API + "/sessions").then(res => setSessions(res.data.sessions));
-  };
-
-  // Inisialisasi WhatsApp (hanya jika sessionId valid)
   const handleInitWA = async () => {
     if (!sessionId) return;
     setLoading(true);
-    await axios.post(API + `/sessions/${sessionId}/init`);
+    try {
+      await api.post(`/sessions/${sessionId}/init`);
+      reloadSessions();
+      setNotif("Inisialisasi ulang WA berhasil, silakan scan QR lagi.");
+    } catch {
+      setNotif("Gagal inisialisasi ulang.");
+    }
     setLoading(false);
-    alert("WA Client inisialisasi (cek QR scanner).");
+  };
+
+  const handleAddSession = async () => {
+    if (!newSession) return;
+    setLoading(true);
+    try {
+      await api.post("/sessions", { sessionId: newSession, webhookUrl });
+      setNewSession("");
+      reloadSessions();
+      setNotif("Session berhasil ditambah.");
+    } catch {
+      setNotif("Gagal tambah session.");
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateWebhook = async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    try {
+      await api.put(`/sessions/${sessionId}/webhook`, { webhookUrl });
+      reloadSessions();
+      setNotif("Webhook berhasil diupdate.");
+    } catch {
+      setNotif("Gagal update webhook.");
+    }
+    setLoading(false);
   };
 
   return (
     <div>
-      <h2>Kelola Session & Webhook</h2>
-      <input
-        type="text"
-        placeholder="SessionId baru"
-        value={input}
-        onChange={e => setInput(e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="Webhook URL"
-        value={webhook}
-        onChange={e => setWebhook(e.target.value)}
-      />
-      <button disabled={loading || !input} onClick={handleAdd}>Tambah Session</button>
-      <hr />
-      <label>Pilih Session:</label>
-      <select value={sessionId} onChange={handleSelect}>
+      <h2 className="section-title">Pilih / Kelola Session</h2>
+      {notif && <div className="notif-toast">{notif}</div>}
+      <label style={{fontWeight:"bold",marginBottom:3}}>Pilih Session:</label>
+      <select className="input-main" value={sessionId} onChange={e => setSessionId(e.target.value)}>
         <option value="">-- Pilih Session --</option>
-        {sessions.map(sess =>
+        {sessions.map(sess => (
           <option key={sess.session_id} value={sess.session_id}>
             {sess.session_id}
           </option>
-        )}
+        ))}
       </select>
-      <button disabled={!sessionId || loading} onClick={handleDelete}>Hapus</button>
-      <button disabled={!sessionId || loading} onClick={handleInitWA}>Inisialisasi WA</button>
-      <br />
+      {sessionId && waStatus !== "connected" &&
+        <button className="btn-main" style={{marginTop:8}} onClick={handleInitWA} disabled={loading}>
+          Inisialisasi WA
+        </button>
+      }
+      <label style={{marginTop:12,display:"block",fontWeight:"bold"}}>Webhook URL:</label>
       <input
-        type="text"
-        placeholder="Edit Webhook URL"
-        value={webhook}
-        onChange={e => setWebhook(e.target.value)}
-        disabled={!sessionId}
+        className="input-main"
+        value={webhookUrl}
+        placeholder="Webhook URL"
+        style={{ borderColor: !webhookUrl ? "#ef7676" : "#b8cbff" }}
+        onChange={e => setWebhookUrl(e.target.value)}
       />
-      <button disabled={!sessionId || loading} onClick={handleEditWebhook}>Update Webhook</button>
+      <button className="btn-main" disabled={!sessionId || loading} onClick={handleUpdateWebhook}>Update Webhook</button>
+
+      <div className="divider" />
+      <label style={{fontWeight:"bold",marginBottom:3}}>Tambah Session Baru:</label>
+      <input
+        className="input-main"
+        placeholder="SessionId baru"
+        value={newSession}
+        onChange={e => setNewSession(e.target.value)}
+      />
+      <button className="btn-main" disabled={!newSession || loading} onClick={handleAddSession}>Tambah Session</button>
     </div>
   );
-};
+}
+
 
 export default SessionManager;

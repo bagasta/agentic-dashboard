@@ -249,6 +249,42 @@ body {
   font-weight: 600;
 }
 
+.template-agent-page {
+  padding: 10px 10px 50px 10px;
+}
+.template-card-list {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.template-card {
+  background: #fff;
+  box-shadow: 0 1.5px 11px 0 rgba(0,0,0,0.07);
+  border-radius: 17px;
+  padding: 32px 30px 26px 30px;
+  width: 315px;
+  transition: box-shadow .18s;
+  cursor: pointer;
+  border: 1.7px solid #f0f2ff;
+  position: relative;
+}
+.template-card:hover {
+  box-shadow: 0 3px 19px 0 rgba(33,118,255,0.11);
+  border-color: #2176ff;
+}
+.card-title {
+  font-weight: 700;
+  font-size: 22px;
+  color: #2176ff;
+  margin-bottom: 13px;
+}
+.card-desc {
+  font-size: 15.2px;
+  color: #626b88;
+  margin-bottom: 7px;
+}
+
+
 ::-webkit-scrollbar {width:7px;}
 ::-webkit-scrollbar-thumb {background:#e5e9fa;border-radius:7px;}
 ::-webkit-scrollbar-track {background:#fafdff;}

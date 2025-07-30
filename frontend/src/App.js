@@ -459,7 +459,7 @@ function TemplateAgentMenu() {
 
   // ganti ke env/props untuk production!
   const N8N_API_BASE = "https://n8n.chiefaiofficer.id/api/v1/workflows";
-  const N8N_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxZmI3MTRkYy0wY2RjLTQ3ZTQtYmI5Ny01MzVlY2ZhZjU1M2UiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzUzNjY5NTQxfQ.mt-LNfehfAdUnwVG3Jv-GHnldx6bo_seWD4T0wwpWVs";
+  const N8N_API_KEY = "API KEY";
 
   const handleSelect = (tpl) => {
     setSelectedTemplate(tpl);

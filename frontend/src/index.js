@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import '@coreui/coreui/dist/css/coreui.min.css';
-import '@coreui/icons/css/coreui-icons.min.css';
+import '@coreui/icons/css/all.min.css';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

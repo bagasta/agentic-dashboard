@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { FiTrash2, FiRepeat, FiEdit2, FiSave, FiX, FiQrcode } from "react-icons/fi";
+import { FiTrash2, FiRepeat, FiEdit2, FiSave, FiX } from "react-icons/fi";
+import { FaQrcode } from "react-icons/fa";
 import axios from "axios";
 const API = "http://localhost:3001";
 
@@ -102,7 +103,7 @@ export default function SessionTable() {
                 {/* SCAN QR jika belum connect, atau reinit jika sudah */}
                 {sess.status !== "connected" ? (
                   <button className="action-btn" onClick={() => handleScanQr(sess, idx)} title="Scan QR">
-                    <FiQrcode size={18}/>
+                    <FaQrcode size={18}/>
                   </button>
                 ) : (
                   <button className="action-btn" onClick={() => handleReInit(sess)} title="Re-Init">

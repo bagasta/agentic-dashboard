@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FiTrash2, FiRepeat, FiEdit2, FiSave, FiX, FiQrcode } from "react-icons/fi";
-import axios from "axios";
-const API = "http://localhost:3001";
+import api from "../api";
 
 // Helper status
 function getStatusLabel(status) {
@@ -20,7 +19,7 @@ export default function SessionTable() {
   // Ambil semua session
   useEffect(() => { fetchSessions(); }, []);
   const fetchSessions = async () => {
-    const res = await axios.get(API + "/sessions");
+    const res = await api.get('/sessions');
     setSessions(res.data.sessions);
   };
 
@@ -29,7 +28,7 @@ export default function SessionTable() {
     setShowQrIdx(idx);
     setQrUrl("");
     // Cek status dulu, jika sudah connected jangan tampilkan QR
-    const res = await axios.get(`${API}/sessions/${sess.session_id}/qr`);
+    const res = await api.get(`/sessions/${sess.session_id}/qr`);
     if (res.data.qr) setQrUrl(res.data.qr);
     else setQrUrl("");
   };
@@ -37,7 +36,7 @@ export default function SessionTable() {
   // Action DELETE
   const handleDelete = async (sess) => {
     if (window.confirm(`Hapus session "${sess.session_id}"?`)) {
-      await axios.delete(`${API}/sessions/${sess.session_id}`);
+      await api.delete(`/sessions/${sess.session_id}`);
       fetchSessions();
     }
   };
@@ -48,7 +47,7 @@ export default function SessionTable() {
     setWebhookEdit(url);
   };
   const handleSaveWebhook = async (sess) => {
-    await axios.put(`${API}/sessions/${sess.session_id}/webhook`, { webhookUrl: webhookEdit });
+    await api.put(`/sessions/${sess.session_id}/webhook`, { webhookUrl: webhookEdit });
     setEditIdx(-1); setWebhookEdit("");
     fetchSessions();
   };
@@ -56,7 +55,7 @@ export default function SessionTable() {
   // Action SCAN ULANG (Re-init WA)
   const handleReInit = async (sess) => {
     setLoading(true);
-    await axios.post(`${API}/sessions/${sess.session_id}/init`);
+    await api.post(`/sessions/${sess.session_id}/init`);
     setLoading(false);
     fetchSessions();
   };

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api";
 
 const SendMessage = ({ sessionId }) => {
   const [number, setNumber] = useState("");
@@ -12,7 +12,7 @@ const SendMessage = ({ sessionId }) => {
     e.preventDefault();
     setStatus("Mengirim...");
     try {
-      await axios.post(`http://localhost:3001/send/${sessionId}`, { number, message });
+      await api.post(`/send/${sessionId}`, { number, message });
       setStatus("Pesan berhasil dikirim!");
     } catch (err) {
       setStatus("Gagal kirim: " + err.response?.data?.error || err.message);

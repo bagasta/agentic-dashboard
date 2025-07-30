@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-const API = "http://localhost:3001";
+import api from "../api";
 
 const SessionLog = ({ sessionId }) => {
   const [logs, setLogs] = useState([]);
   useEffect(() => {
     if (!sessionId) return setLogs([]);
     const interval = setInterval(() => {
-      axios.get(`${API}/sessions/${sessionId}/logs`)
+      api.get(`/sessions/${sessionId}/logs`)
         .then(res => setLogs(res.data.logs || []));
     }, 1500);
     return () => clearInterval(interval);

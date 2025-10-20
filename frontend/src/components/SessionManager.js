@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-const API = "http://localhost:3001";
-
-// ... (import dan axios instance tetap sama)
+import api from "../api";
 
 function SessionManager({ sessionId, setSessionId, sessions, reloadSessions }) {
   const [webhookUrl, setWebhookUrl] = useState("");

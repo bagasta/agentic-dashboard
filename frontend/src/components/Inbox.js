@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 
 const Inbox = ({ sessionId }) => {
   const [messages, setMessages] = useState([]);
@@ -7,7 +7,7 @@ const Inbox = ({ sessionId }) => {
   useEffect(() => {
     if (!sessionId) return;
     const interval = setInterval(() => {
-      axios.get(`http://localhost:3001/inbox/${sessionId}`)
+      api.get(`/inbox/${sessionId}`)
         .then(res => setMessages(res.data.messages || []));
     }, 2000);
     return () => clearInterval(interval);

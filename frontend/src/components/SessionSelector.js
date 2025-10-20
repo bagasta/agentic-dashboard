@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 
 const SessionSelector = ({ sessionId, setSessionId, onInitSession }) => {
   const [input, setInput] = useState(sessionId || "");
@@ -7,7 +7,7 @@ const SessionSelector = ({ sessionId, setSessionId, onInitSession }) => {
 
   // Fetch sessions aktif dari backend
   useEffect(() => {
-    axios.get("http://localhost:3001/sessions")
+    api.get('/sessions')
       .then(res => setSessions(res.data.sessions || []));
   }, [sessionId]);
 
